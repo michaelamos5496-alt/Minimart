@@ -22,7 +22,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     <div className="flex h-screen bg-transparent text-slate-100 font-sans relative overflow-hidden">
       {/* Mobile menu toggle */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/5 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-4 z-50">
-        <div className="font-bold text-xl text-indigo-400 truncate pr-4">{user?.store_name || "MiniMart OS"}</div>
+        <div className="font-bold text-xl text-indigo-400 truncate pr-4">{user?.store_name || "STORE KEEPER"}</div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-300">
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -40,7 +40,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
              <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 font-bold shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
                 M
              </div>
-             <div className="font-medium text-lg text-slate-200 tracking-wide truncate">{user?.store_name || "MiniMart"}</div>
+             <div className="font-medium text-lg text-slate-200 tracking-wide truncate">{user?.store_name || "STORE KEEPER"}</div>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 {
-  "name": "MiniMart OS",
+  "name": "STORE KEEPER",
   "description": "A smart Retail POS, Inventory, and Analytics system designed for mini marts.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

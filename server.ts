@@ -137,6 +137,7 @@ async function startServer() {
         if (!validPass) return res.status(400).json({ error: "Invalid password" });
 
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+        logActivity(user.id, 'USER_LOGIN', `Store owner signed in`, 'Store Owner', `Logged in via email`);
         res.json({ token, user: { id: user.id, name: user.name, email: user.email, store_name: user.store_name, currency_symbol: user.currency_symbol } });
       } else {
         const stmt = db.prepare('SELECT * FROM staff WHERE login_id = ?');
@@ -150,6 +151,7 @@ async function startServer() {
         const user = userStmt.get(staff.user_id) as any;
 
         const token = jwt.sign({ id: user.id, email: user.email, staff_id: staff.id }, JWT_SECRET, { expiresIn: '7d' });
+        logActivity(user.id, 'USER_LOGIN', `Staff signed in`, staff.name, `Role: ${staff.role}`);
         res.json({
           token,
           user: {
@@ -258,6 +260,7 @@ async function startServer() {
     const { name, price, cost_price, stock_qty, expiry_date, barcode } = req.body;
     const stmt = db.prepare('INSERT INTO products (user_id, name, price, cost_price, stock_qty, expiry_date, barcode) VALUES (?, ?, ?, ?, ?, ?, ?)');
     const info = stmt.run(req.user.id, name, price, cost_price, stock_qty, expiry_date, barcode);
+    logActivity(req.user.id, 'INVENTORY_ADDED', `Added new product: ${name}`, req.user.staff_name || 'Store Owner', `Stock qty: ${stock_qty}, Price: ${price}`);
     res.json({ id: info.lastInsertRowid, ...req.body });
   });
 
@@ -267,14 +270,25 @@ async function startServer() {
     const stmt = db.prepare('UPDATE products SET name = ?, price = ?, cost_price = ?, stock_qty = ?, expiry_date = ?, barcode = ? WHERE id = ? AND user_id = ?');
     const info = stmt.run(name, price, cost_price, stock_qty, expiry_date, barcode, id, req.user.id);
     if (info.changes === 0) return res.status(404).json({ error: "Product not found or unauthorized" });
+    logActivity(req.user.id, 'INVENTORY_UPDATED', `Updated product: ${name}`, req.user.staff_name || 'Store Owner', `New Stock: ${stock_qty}, New Price: ${price}`);
     res.json({ success: true });
   });
 
   app.delete("/api/products/:id", authenticateToken, (req: any, res) => {
     const { id } = req.params;
+    
+    // Get product name before deleting
+    const productStmt = db.prepare('SELECT name FROM products WHERE id = ? AND user_id = ?');
+    const product = productStmt.get(id, req.user.id) as any;
+    
     const stmt = db.prepare('DELETE FROM products WHERE id = ? AND user_id = ?');
     const info = stmt.run(id, req.user.id);
     if (info.changes === 0) return res.status(404).json({ error: "Product not found or unauthorized" });
+    
+    if (product) {
+        logActivity(req.user.id, 'INVENTORY_DELETED', `Deleted product: ${product.name}`, req.user.staff_name || 'Store Owner', `Deleted ID: ${id}`);
+    }
+    
     res.json({ success: true });
   });
 

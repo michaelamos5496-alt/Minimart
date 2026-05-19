@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../lib/api';
 import { Check, Star, Shield, Zap } from 'lucide-react';
@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 const TIERS = [
   {
     name: 'Starter',
-    price: '$19',
+    basePrice: 6.99,
     description: 'Perfect for small stores just getting started.',
     features: ['Up to 100 products', 'Basic POS functionality', 'Standard Support'],
     icon: Star,
@@ -16,7 +16,7 @@ const TIERS = [
   },
   {
     name: 'Premium',
-    price: '$49',
+    basePrice: 15.49,
     description: 'For growing businesses running multiple terminal instances.',
     features: ['Unlimited products', 'Advanced Inventory management', 'Analytics Dashboard', 'Priority Support'],
     icon: Zap,
@@ -26,7 +26,7 @@ const TIERS = [
   },
   {
     name: 'Enterprise',
-    price: '$149',
+    basePrice: 22.99,
     description: 'Advanced features for large retail operations.',
     features: ['Everything in Premium', 'Staff Management (Unlimited)', 'API Access', 'Dedicated Account Manager'],
     icon: Shield,
@@ -35,10 +35,45 @@ const TIERS = [
   }
 ];
 
-export const Subscription = () => {
+export const Subscription = ({ isAdContext, onSuccess }: { isAdContext?: boolean, onSuccess?: () => void }) => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<string | null>(null);
+  const [currencyData, setCurrencyData] = useState<{ code: string; rate: number } | null>(null);
+
+  useEffect(() => {
+    const fetchCurrency = async () => {
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/');
+        const ipData = await ipRes.json();
+        const currencyCode = ipData.currency || 'USD';
+        
+        if (currencyCode !== 'USD') {
+          const exchangeRes = await fetch(`https://open.er-api.com/v6/latest/USD`);
+          const exchangeData = await exchangeRes.json();
+          const rate = exchangeData.rates[currencyCode] || 1;
+          setCurrencyData({ code: currencyCode, rate });
+        } else {
+          setCurrencyData({ code: 'USD', rate: 1 });
+        }
+      } catch (e) {
+        console.error("Failed to fetch currency info", e);
+        setCurrencyData({ code: 'USD', rate: 1 });
+      }
+    };
+    fetchCurrency();
+  }, []);
+
+  const getPrice = (basePrice: number) => {
+    if (!currencyData) return "...";
+    const converted = basePrice * currencyData.rate;
+    const formatter = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currencyData.code,
+      maximumFractionDigits: currencyData.rate > 100 ? 0 : 2
+    });
+    return formatter.format(converted);
+  };
 
   const handleUpgrade = async (tierName: string) => {
     setLoading(tierName);
@@ -52,7 +87,11 @@ export const Subscription = () => {
           subscription_tier: data.user.subscription_tier, 
           subscription_expiry: data.user.subscription_expiry 
         });
-        navigate('/');
+        if (onSuccess) {
+           onSuccess();
+        } else {
+           navigate('/');
+        }
       }
     } catch (e) {
       console.error("Upgrade failed:", e);
@@ -64,14 +103,16 @@ export const Subscription = () => {
   const currentTier = user?.subscription_tier || 'Free';
 
   return (
-    <div className="max-w-6xl mx-auto py-10 px-4">
-      <div className="text-center mb-12">
-        <h1 className="text-3xl font-light tracking-tight text-white mb-4">Subscription Plans</h1>
-        <p className="text-slate-400 max-w-2xl mx-auto">
-          Upgrade your workspace to unlock advanced point-of-sale features, staff management, and powerful analytics. 
-          Currently on the <span className="text-white font-medium">{currentTier}</span> plan.
-        </p>
-      </div>
+    <div className={`max-w-6xl mx-auto px-4 ${isAdContext ? 'py-4' : 'py-10'}`}>
+      {!isAdContext && (
+        <div className="text-center mb-12">
+          <h1 className="text-3xl font-light tracking-tight text-white mb-4">Subscription Plans</h1>
+          <p className="text-slate-400 max-w-2xl mx-auto">
+            Upgrade your workspace to unlock advanced point-of-sale features, staff management, and powerful analytics. 
+            Currently on the <span className="text-white font-medium">{currentTier}</span> plan.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {TIERS.map((tier) => (
@@ -89,7 +130,7 @@ export const Subscription = () => {
             </div>
             <h3 className="text-xl font-medium text-white mb-2">{tier.name}</h3>
             <div className="flex items-baseline gap-1 mb-4">
-              <span className="text-4xl font-light tracking-tighter text-white">{tier.price}</span>
+              <span className="text-4xl font-light tracking-tighter text-white">{getPrice(tier.basePrice)}</span>
               <span className="text-sm text-slate-500">/mo</span>
             </div>
             <p className="text-sm text-slate-400 mb-8 flex-1">{tier.description}</p>
