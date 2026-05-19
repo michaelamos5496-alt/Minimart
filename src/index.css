@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --color-slate-950: #020617;
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+body {
+  background: radial-gradient(circle at top left, #1a3a5a 0%, #0f1722 50%, #07090d 100%);
+  color: #f1f5f9;
+  min-height: 100vh;
+}
