@@ -38,7 +38,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem('token')}` },
         body: JSON.stringify(claimForm)
       });
-      const data = await res.json();
+      let data;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch(e) {
+        throw new Error(`Server returned non-JSON: ${text.substring(0, 50)}...`);
+      }
       if (res.ok) {
         login(data.token, data.user);
         setShowClaimModal(false);

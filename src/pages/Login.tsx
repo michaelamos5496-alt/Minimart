@@ -31,7 +31,13 @@ export const Login = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+      let data;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON: ${text.substring(0, 50)}...`);
+      }
       if (!res.ok) throw new Error(data.error || "Failed to login");
 
       login(data.token, data.user);
