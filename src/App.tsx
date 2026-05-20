@@ -17,17 +17,10 @@ import { Settings } from "./pages/Settings";
 import { Subscription } from "./pages/Subscription";
 import { X } from "lucide-react";
 
+import { Welcome } from "./pages/Welcome";
+
 const ProtectedRoute = ({ children, requiredPermission, requireOwner }: { children: React.ReactNode, requiredPermission?: string, requireOwner?: boolean }) => {
   const { user, isLoading } = useAuth();
-  
-  const [showAd, setShowAd] = React.useState(() => {
-    return !sessionStorage.getItem('hasSeenSubscriptionAd');
-  });
-
-  const handleDismissAd = () => {
-    sessionStorage.setItem('hasSeenSubscriptionAd', 'true');
-    setShowAd(false);
-  };
   
   if (isLoading) {
     return (
@@ -46,44 +39,17 @@ const ProtectedRoute = ({ children, requiredPermission, requireOwner }: { childr
   }
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   // Show Ad for store owners who have not seen it this session and are on Starter/Free tier
   const isOwner = !user.staff_id;
-  const isFreeOrStarter = !user.subscription_tier || user.subscription_tier === 'Free' || user.subscription_tier === 'Starter';
+  const isFreeOrStarter = !user.subscription_tier || user.subscription_tier === 'Free';
   
-  if (showAd && isOwner && isFreeOrStarter) {
-    return (
-      <div className="fixed inset-0 bg-[#020617]/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 overflow-y-auto">
-        <div className="w-full max-w-6xl relative bg-[#0a111a]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-4 md:p-8 shadow-2xl shadow-indigo-500/10 mt-10 mb-10 overflow-hidden">
-           <div className="absolute top-0 right-0 p-4 z-50">
-             <button onClick={handleDismissAd} className="text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 p-2 rounded-full transition-all border border-white/5">
-                <X size={20} />
-             </button>
-           </div>
-           
-           <div className="text-center mb-6">
-              <h2 className="text-sm font-bold text-blue-400 uppercase tracking-widest mb-1 mt-4">Special Offer</h2>
-              <h1 className="text-2xl md:text-4xl font-light text-white mb-2">Unlock Your Store's Full Potential</h1>
-              <p className="text-slate-400 max-w-2xl mx-auto text-sm">You are currently using the limited {user.subscription_tier || 'Free'} plan. Upgrade today to unlock advanced point-of-sale features, staff management, and powerful real-time analytics.</p>
-           </div>
-           
-           <div className="scale-95 origin-top relative z-10">
-               {/* Prevent clicks on the actual Subscription page inside the ad to avoid weird state, or let them click? 
-                   If they click Upgrade, it'll navigate. We want them to navigate to Layout so let's dismiss the Ad when they upgrade!
-               */}
-               <Subscription isAdContext onSuccess={handleDismissAd} />
-           </div>
-           
-           <div className="flex justify-center mt-2 pb-4">
-             <button onClick={handleDismissAd} className="text-sm text-slate-500 hover:text-white underline underline-offset-4 decoration-white/20 transition-all font-medium">
-               No thanks, I'll stick to the limited plan.
-             </button>
-           </div>
-        </div>
-      </div>
-    );
+  if (isOwner && isFreeOrStarter) {
+    if (!window.location.pathname.includes('/subscription')) {
+      return <Navigate to="/subscription" replace />;
+    }
   }
 
   if (requireOwner && user.staff_id) {
@@ -105,8 +71,10 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/welcome" element={<Welcome />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/pricing" element={<div className="min-h-screen bg-[#020617]"><Subscription /></div>} />
           
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/inventory" element={<ProtectedRoute requiredPermission="inventory_view"><Inventory /></ProtectedRoute>} />

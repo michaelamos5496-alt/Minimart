@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(storedToken);
       fetchUser(storedToken);
     } else {
-      setTimeout(() => setIsLoading(false), 1500);
+      setIsLoading(false);
     }
   }, []);
 

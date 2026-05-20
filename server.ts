@@ -105,7 +105,7 @@ async function startServer() {
   
   // Auth Routes
   app.post("/api/auth/register", async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, subscription_tier } = req.body;
     try {
       const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
       const existingUser = stmt.get(email);
@@ -114,12 +114,16 @@ async function startServer() {
       const salt = await bcrypt.genSalt(10);
       const hash = await bcrypt.hash(password, salt);
 
-      const insertStmt = db.prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)');
-      const info = insertStmt.run(name, email, hash);
+      const exp = new Date();
+      exp.setDate(exp.getDate() + 30);
+      const expiryStr = exp.toISOString();
+
+      const insertStmt = db.prepare('INSERT INTO users (name, email, password_hash, subscription_tier, subscription_expiry) VALUES (?, ?, ?, ?, ?)');
+      const info = insertStmt.run(name, email, hash, subscription_tier || 'Free', subscription_tier && subscription_tier !== 'Free' ? expiryStr : null);
       const user_id = info.lastInsertRowid;
 
       const token = jwt.sign({ id: user_id, email }, JWT_SECRET, { expiresIn: '7d' });
-      res.json({ token, user: { id: user_id, name, email } });
+      res.json({ token, user: { id: user_id, name, email, subscription_tier: subscription_tier || 'Free', subscription_expiry: subscription_tier && subscription_tier !== 'Free' ? expiryStr : null } });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -201,6 +205,23 @@ async function startServer() {
     const stmt = db.prepare('UPDATE users SET store_name = ?, currency_symbol = ? WHERE id = ?');
     stmt.run(store_name, currency_symbol, req.user.id);
     res.json({ success: true });
+  });
+
+  app.put("/api/auth/claim", authenticateToken, async (req: any, res) => {
+    const { name, email, password } = req.body;
+    try {
+      const crypto = require('crypto');
+      const salt = await bcrypt.genSalt(10);
+      const hash = await bcrypt.hash(password, salt);
+      const stmt = db.prepare('UPDATE users SET name = ?, email = ?, password_hash = ? WHERE id = ?');
+      stmt.run(name, email, hash, req.user.id);
+      
+      const token = jwt.sign({ id: req.user.id, email }, JWT_SECRET, { expiresIn: '7d' });
+      
+      res.json({ success: true, token, user: { name, email } });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/subscription/upgrade", authenticateToken, (req: any, res) => {
@@ -438,6 +459,32 @@ async function startServer() {
     
     logActivity(req.user.id, 'STAFF_DELETED', `Deleted staff ID: ${id}`, req.user.staff_name || 'Store Owner', '');
     res.json({ success: true });
+  });
+
+  app.get("/api/currency", async (req: any, res) => {
+    try {
+      let clientIp = '';
+      const forwarded = req.headers['x-forwarded-for'];
+      if (forwarded) {
+        clientIp = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : forwarded[0];
+      }
+      
+      const ipRes = await fetch(`https://ipwho.is/${clientIp}`);
+      const ipData = await ipRes.json();
+      const currencyCode = ipData?.currency?.code || 'USD';
+
+      if (currencyCode !== 'USD') {
+        const exchangeRes = await fetch(`https://open.er-api.com/v6/latest/USD`);
+        const exchangeData = await exchangeRes.json();
+        const rate = exchangeData?.rates?.[currencyCode] || 1;
+        res.json({ code: currencyCode, rate });
+      } else {
+        res.json({ code: 'USD', rate: 1 });
+      }
+    } catch (e: any) {
+      console.error("Currency API Error:", e.message);
+      res.json({ code: 'USD', rate: 1 });
+    }
   });
 
   // Vite middleware for development

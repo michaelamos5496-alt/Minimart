@@ -15,8 +15,42 @@ const navItems = [
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [showClaimModal, setShowClaimModal] = React.useState(false);
+  const [claimForm, setClaimForm] = React.useState({ name: "", email: "", password: "" });
+  const [claimLoading, setClaimLoading] = React.useState(false);
   const location = useLocation();
-  const { logout, user } = useAuth();
+  const { logout, user, updateUser, login } = useAuth();
+  
+  const isGuest = user && !user.staff_id && user.email?.startsWith("guest_");
+
+  React.useEffect(() => {
+    if (isGuest && !showClaimModal) {
+      setShowClaimModal(true);
+    }
+  }, [isGuest]);
+
+  const handleClaimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setClaimLoading(true);
+    try {
+      const res = await fetch("/api/auth/claim", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify(claimForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        login(data.token, data.user);
+        setShowClaimModal(false);
+      } else {
+        alert(data.error);
+      }
+    } catch(err) {
+      console.error(err);
+    } finally {
+      setClaimLoading(false);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-transparent text-slate-100 font-sans relative overflow-hidden">
@@ -158,6 +192,36 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm z-30 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
+      )}
+
+      {/* Claim Account Modal */}
+      {showClaimModal && (
+        <div className="fixed inset-0 z-50 bg-[#020617]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
+            <h2 className="text-2xl tracking-tight font-light text-white mb-2">Save Your Account</h2>
+            <p className="text-slate-400 text-sm mb-6 max-w-md">Create your dedicated sign in details to securely keep your {user?.subscription_tier} subscription and store data.</p>
+            <form onSubmit={handleClaimSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
+                <input required type="text" value={claimForm.name} onChange={e => setClaimForm({...claimForm, name: e.target.value})} className="w-full bg-[#0a111a]/60 border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="John Doe" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                <input required type="email" value={claimForm.email} onChange={e => setClaimForm({...claimForm, email: e.target.value})} className="w-full bg-[#0a111a]/60 border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="john@example.com" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Password</label>
+                <input required type="password" value={claimForm.password} onChange={e => setClaimForm({...claimForm, password: e.target.value})} className="w-full bg-[#0a111a]/60 border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="••••••••" />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button type="button" onClick={() => setShowClaimModal(false)} className="px-5 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-white/5 transition-colors">Cancel</button>
+                <button type="submit" disabled={claimLoading} className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-xl font-medium hover:bg-emerald-500/30 transition-colors">
+                  {claimLoading ? 'Saving...' : 'Save Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

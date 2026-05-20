@@ -36,32 +36,28 @@ const TIERS = [
 ];
 
 export const Subscription = ({ isAdContext, onSuccess }: { isAdContext?: boolean, onSuccess?: () => void }) => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, login } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<string | null>(null);
   const [currencyData, setCurrencyData] = useState<{ code: string; rate: number } | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     const fetchCurrency = async () => {
       try {
-        const ipRes = await fetch('https://ipapi.co/json/');
-        const ipData = await ipRes.json();
-        const currencyCode = ipData.currency || 'USD';
-        
-        if (currencyCode !== 'USD') {
-          const exchangeRes = await fetch(`https://open.er-api.com/v6/latest/USD`);
-          const exchangeData = await exchangeRes.json();
-          const rate = exchangeData.rates[currencyCode] || 1;
-          setCurrencyData({ code: currencyCode, rate });
-        } else {
-          setCurrencyData({ code: 'USD', rate: 1 });
+        const res = await fetch('/api/currency');
+        const data = await res.json();
+        if (mounted) {
+          setCurrencyData({ code: data.code || 'USD', rate: data.rate || 1 });
         }
       } catch (e) {
-        console.error("Failed to fetch currency info", e);
-        setCurrencyData({ code: 'USD', rate: 1 });
+        if (mounted) {
+          setCurrencyData({ code: 'USD', rate: 1 });
+        }
       }
     };
     fetchCurrency();
+    return () => { mounted = false; };
   }, []);
 
   const getPrice = (basePrice: number) => {
@@ -75,9 +71,17 @@ export const Subscription = ({ isAdContext, onSuccess }: { isAdContext?: boolean
     return formatter.format(converted);
   };
 
+  const isOwner = user && !user.staff_id;
+  const currentTier = user?.subscription_tier || 'Free';
+
   const handleUpgrade = async (tierName: string) => {
     setLoading(tierName);
     try {
+      if (!user) {
+        navigate(`/signup?plan=${tierName}`);
+        return;
+      }
+
       const data = await apiFetch('/api/subscription/upgrade', {
         method: 'POST',
         body: JSON.stringify({ tier: tierName })
@@ -100,17 +104,32 @@ export const Subscription = ({ isAdContext, onSuccess }: { isAdContext?: boolean
     }
   };
 
-  const currentTier = user?.subscription_tier || 'Free';
-
   return (
     <div className={`max-w-6xl mx-auto px-4 ${isAdContext ? 'py-4' : 'py-10'}`}>
       {!isAdContext && (
         <div className="text-center mb-12">
-          <h1 className="text-3xl font-light tracking-tight text-white mb-4">Subscription Plans</h1>
-          <p className="text-slate-400 max-w-2xl mx-auto">
-            Upgrade your workspace to unlock advanced point-of-sale features, staff management, and powerful analytics. 
-            Currently on the <span className="text-white font-medium">{currentTier}</span> plan.
-          </p>
+          {!user ? (
+            <>
+              <div className="w-16 h-16 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 font-bold shrink-0 shadow-[0_0_20px_rgba(59,130,246,0.3)] mx-auto mb-6">
+                 <span className="font-bold text-3xl">M</span>
+              </div>
+              <h1 className="text-4xl font-light tracking-tight text-white mb-4">STORE KEEPER Pricing</h1>
+              <p className="text-slate-400 text-lg max-w-2xl mx-auto mb-4">
+                Select a plan to start managing your point-of-sale, inventory, and staff.
+              </p>
+              <p className="text-sm font-medium text-slate-500">
+                Already have an account? <button onClick={() => navigate('/login')} className="text-blue-400 hover:text-blue-300 ml-1">Sign in here</button>
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-light tracking-tight text-white mb-4">Subscription Plans</h1>
+              <p className="text-slate-400 max-w-2xl mx-auto">
+                Upgrade your workspace to unlock advanced point-of-sale features, staff management, and powerful analytics. 
+                Currently on the <span className="text-white font-medium">{currentTier}</span> plan.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -146,16 +165,16 @@ export const Subscription = ({ isAdContext, onSuccess }: { isAdContext?: boolean
 
             <button 
               onClick={() => handleUpgrade(tier.name)}
-              disabled={loading === tier.name || currentTier === tier.name}
+              disabled={loading === tier.name || (user && currentTier === tier.name)}
               className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all border
-                ${currentTier === tier.name 
+                ${(user && currentTier === tier.name) 
                   ? 'bg-white/5 border-white/10 text-slate-500 cursor-not-allowed' 
                   : tier.popular 
                     ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30' 
                     : 'bg-[#182b42] border-white/10 text-white hover:bg-white/10'
                 }`}
             >
-              {loading === tier.name ? 'Processing...' : currentTier === tier.name ? 'Current Plan' : `Upgrade to ${tier.name}`}
+              {!user ? 'Select Plan' : loading === tier.name ? 'Processing...' : currentTier === tier.name ? 'Current Plan' : `Upgrade to ${tier.name}`}
             </button>
           </div>
         ))}
