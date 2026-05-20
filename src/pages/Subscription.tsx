@@ -46,7 +46,13 @@ export const Subscription = ({ isAdContext, onSuccess }: { isAdContext?: boolean
     const fetchCurrency = async () => {
       try {
         const res = await fetch('/api/currency');
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = { code: 'USD', rate: 1 };
+        }
         if (mounted) {
           setCurrencyData({ code: data.code || 'USD', rate: data.rate || 1 });
         }

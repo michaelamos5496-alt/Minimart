@@ -470,19 +470,33 @@ async function startServer() {
       }
       
       const ipRes = await fetch(`https://ipwho.is/${clientIp}`);
-      const ipData = await ipRes.json();
+      const text = await ipRes.text();
+      
+      let ipData;
+      try {
+        ipData = JSON.parse(text);
+      } catch (e) {
+        // Not JSON, fail silently and return USD
+        return res.json({ code: 'USD', rate: 1 });
+      }
+
       const currencyCode = ipData?.currency?.code || 'USD';
 
       if (currencyCode !== 'USD') {
         const exchangeRes = await fetch(`https://open.er-api.com/v6/latest/USD`);
-        const exchangeData = await exchangeRes.json();
+        const exchangeText = await exchangeRes.text();
+        let exchangeData;
+        try {
+          exchangeData = JSON.parse(exchangeText);
+        } catch (e) {
+          return res.json({ code: currencyCode, rate: 1 });
+        }
         const rate = exchangeData?.rates?.[currencyCode] || 1;
         res.json({ code: currencyCode, rate });
       } else {
         res.json({ code: 'USD', rate: 1 });
       }
     } catch (e: any) {
-      console.error("Currency API Error:", e.message);
       res.json({ code: 'USD', rate: 1 });
     }
   });
